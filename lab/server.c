@@ -14,6 +14,7 @@
 #include <netinet/in.h>
 
 #define PORT 9876 //クライアントプログラムとポート番号を合わせてください
+#define BUFF_SIZE 1024
 
 int main(){
   int i;
@@ -26,41 +27,54 @@ int main(){
   // 各種パラメータ
   int status;
   int numrcv;
+  int fd[2]; //pipe用
+  char buff[BUFF_SIZE]; //pipe用
   char buf[1024];
 
+  pipe( fd );    //パイプの作成
   while(1){//ループで回すことによって何度でもクライアントからつなぐことができる
     // sockaddr_in 構造体のセット
     bzero((char *)&srcAddr, sizeof(srcAddr));
     srcAddr.sin_port = htons(PORT);
     srcAddr.sin_family = AF_INET;
     srcAddr.sin_addr.s_addr = INADDR_ANY;
-    
+
     // ソケットの生成（ストリーム型）
     srcSocket = socket(AF_INET, SOCK_STREAM, 0);
     // ソケットのバインド
     bind(srcSocket, (struct sockaddr *)&srcAddr, sizeof(srcAddr));
     // 接続の許可
     listen(srcSocket, 1);
-    
+
     // 接続の受付け
     printf("接続を待っています\nクライアントプログラムを動かして下さい\n");
     dstSocket = accept(srcSocket, (struct sockaddr *)&dstAddr, &dstAddrSize);
     printf("%s から接続を受けました\n",(char *)inet_ntoa(dstAddr.sin_addr));
     close(srcSocket);
-        
+
     while(1){
       //パケットの受信
       numrcv = read(dstSocket, buf, 1024);
       if(numrcv ==0 || numrcv ==-1 ){
 	close(dstSocket); break;
       }
-      printf("変換前 %s",buf);
-      for (i=0; i< numrcv; i++){ // bufの中の小文字を大文字に変換
-	if(isalpha(buf[i])) buf[i] = toupper(buf[i]);
+      if(fork() == 0){
+        if( fork()==0 ){
+          /* 子プロセスの標準出力をパイプに関連づける */
+          close( STDOUT_FILENO );
+          dup2( fd[1] , STDOUT_FILENO );
+          close( fd[0] );
+          execlp("ruby","ruby","./haihuri.rb",buf,NULL);
+        }
+        /* buffを0で初期化 */
+        for( i=0; i<256 ;i++ ){
+            buff[i] = 0;
+        }
+        read(fd[0],buff,BUFF_SIZE);    /* パイプに出力されたデータをbuffに 読み込む */
+        // パケットの送信
+        write(dstSocket, buff, 1024);
+        fprintf(stdout,"→ %s \n",buff);
       }
-      // パケットの送信
-      write(dstSocket, buf, 1024);
-      fprintf(stdout,"→ 変換後 %s \n",buf);
     }
   }
   return(0);
