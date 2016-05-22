@@ -45,7 +45,7 @@ int main(){
     return(-1);
   }
   printf("%s に接続しました\n",destination);
-  printf("適当なアルファベットを入力してください\n");
+  printf("適当な文字列を入力してください\n");
   
   while (1){
     scanf("%s",buf);
