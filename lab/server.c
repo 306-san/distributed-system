@@ -31,35 +31,36 @@ int main(){
   char buff[BUFF_SIZE]; //pipe用
   char buf[1024];
 
-  pipe( fd );    //パイプの作成
-  while(1){//ループで回すことによって何度でもクライアントからつなぐことができる
-    // sockaddr_in 構造体のセット
-    bzero((char *)&srcAddr, sizeof(srcAddr));
-    srcAddr.sin_port = htons(PORT);
-    srcAddr.sin_family = AF_INET;
-    srcAddr.sin_addr.s_addr = INADDR_ANY;
 
-    // ソケットの生成（ストリーム型）
-    srcSocket = socket(AF_INET, SOCK_STREAM, 0);
-    // ソケットのバインド
-    bind(srcSocket, (struct sockaddr *)&srcAddr, sizeof(srcAddr));
-    // 接続の許可
-    listen(srcSocket, 1);
+  // sockaddr_in 構造体のセット
+  bzero((char *)&srcAddr, sizeof(srcAddr));
+  srcAddr.sin_port = htons(PORT);
+  srcAddr.sin_family = AF_INET;
+  srcAddr.sin_addr.s_addr = INADDR_ANY;
 
+  // ソケットの生成（ストリーム型）
+  srcSocket = socket(AF_INET, SOCK_STREAM, 0);
+  // ソケットのバインド
+  bind(srcSocket, (struct sockaddr *)&srcAddr, sizeof(srcAddr));
+  // 接続の許可
+  listen(srcSocket, 1);
+
+  while(1){
     // 接続の受付け
-    printf("接続を待っています\nクライアントプログラムを動かして下さい\n");
-    dstSocket = accept(srcSocket, (struct sockaddr *)&dstAddr, &dstAddrSize);
-    printf("%s から接続を受けました\n",(char *)inet_ntoa(dstAddr.sin_addr));
-    close(srcSocket);
-
-    while(1){
+      printf("接続を待っています\nクライアントプログラムを動かして下さい\n");
+      dstSocket = accept(srcSocket, (struct sockaddr *)&dstAddr, &dstAddrSize);
+      printf("%s から接続を受けました\n",(char *)inet_ntoa(dstAddr.sin_addr));
+      if(fork()==0){
+        close(srcSocket);
+        pipe(fd);    //パイプの作成
       //パケットの受信
+      while(1){
       numrcv = read(dstSocket, buf, 1024);
       if(numrcv ==0 || numrcv ==-1 ){
-	close(dstSocket); break;
+	      close(dstSocket);
+        _exit(0);
       }
-      if(fork() == 0){
-        if( fork()==0 ){
+      if(fork()==0){
           /* 子プロセスの標準出力をパイプに関連づける */
           close( STDOUT_FILENO );
           dup2( fd[1] , STDOUT_FILENO );
@@ -75,7 +76,9 @@ int main(){
         write(dstSocket, buff, 1024);
         fprintf(stdout,"→ %s \n",buff);
       }
+    } else{
+        close(dstSocket);
+      }
     }
-  }
   return(0);
 }
